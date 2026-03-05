@@ -1,0 +1,15 @@
+{
+  "name": "agent-relay-server",
+  "version": "1.0.0",
+  "description": "外网中转服务 - 用于内网AI服务与外网客户端通信",
+  "main": "version1-http.js",
+  "scripts": {
+    "start:http": "node version1-http.js",
+    "start:ws": "node version2-websocket.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "uuid": "^9.0.0"
+  }
+}
