@@ -16,7 +16,7 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8000;
 
 // 任务状态枚举
 const TaskStatus = {

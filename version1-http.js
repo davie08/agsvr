@@ -168,7 +168,7 @@ app.delete('/api/tasks/completed', (req, res) => {
 
 // ==================== 启动服务器 ====================
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
   console.log(`\n========================================`);
   console.log(`HTTP版本中转服务已启动`);
