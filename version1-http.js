@@ -32,24 +32,63 @@ const tasks = new Map();
 /**
  * 启动Agent会话
  * POST /api/client/startAgent
- * Body: { "input": "用户输入的文本" }
+ * Body: { "input": "用户输入的文本", "uuid": "可选，用于连续对话的会话ID" }
  * Response: { "taskId": "xxx", "status": "todo" }
  */
 app.post('/api/client/startAgent', (req, res) => {
-  const { input } = req.body;
+  const { input, uuid } = req.body;
   
   if (!input) {
     return res.status(400).json({ error: 'input参数必填' });
   }
 
-  const taskId = uuidv4();
+  // 使用请求中的uuid，如果没有则生成新的
+  const taskId = uuid || uuidv4();
+  
+  // 检查任务是否已存在
+  const existingTask = tasks.get(taskId);
+  
+  if (existingTask) {
+    // 如果任务存在且未完成，返回错误
+    if (existingTask.status !== TaskStatus.COMPLETED && existingTask.status !== TaskStatus.ERROR) {
+      return res.status(400).json({ 
+        error: '任务正在进行中，请等待完成后再提交新任务',
+        taskId: taskId,
+        status: existingTask.status
+      });
+    }
+    
+    // 如果任务已完成或出错，创建新的任务（保持同一个taskId，实现连续对话）
+    const task = {
+      id: taskId,
+      status: TaskStatus.TODO,
+      input: input,
+      output: null,
+      createdAt: existingTask.createdAt, // 保持原始创建时间
+      updatedAt: new Date().toISOString(),
+      isContinuation: true // 标记为连续对话
+    };
+    
+    tasks.set(taskId, task);
+    console.log(`[Client] 连续对话任务: ${taskId}, 输入: ${input}`);
+    
+    return res.json({
+      taskId: taskId,
+      status: task.status,
+      createdAt: task.createdAt,
+      isContinuation: true
+    });
+  }
+
+  // 新任务
   const task = {
     id: taskId,
     status: TaskStatus.TODO,
     input: input,
     output: null,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    isContinuation: false
   };
 
   tasks.set(taskId, task);
@@ -58,7 +97,8 @@ app.post('/api/client/startAgent', (req, res) => {
   res.json({
     taskId: taskId,
     status: task.status,
-    createdAt: task.createdAt
+    createdAt: task.createdAt,
+    isContinuation: false
   });
 });
 
