@@ -173,7 +173,7 @@ app.put('/api/agent/updateAgentStatus/:taskId', (req, res) => {
   task.output = output !== undefined ? output : task.output;
   task.updatedAt = new Date().toISOString();
 
-  console.log(`[Agent] 更新任务: ${taskId}, 状态: ${task.status}`);
+  console.log(`[Agent] 更新任务: ${taskId}, 状态: ${task.status}, 输出: ${task.output}`);
 
   res.json({
     success: true,
