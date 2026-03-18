@@ -12,6 +12,9 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -185,6 +188,91 @@ app.put('/api/agent/updateAgentStatus/:taskId', (req, res) => {
   });
 });
 
+// ==================== 图片上传接口 ====================
+
+// 创建上传目录
+const uploadDir = path.join(__dirname, 'uploads', 'images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`[System] 创建上传目录: ${uploadDir}`);
+}
+
+// 配置 multer 存储
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // 生成唯一文件名：uuid + 原始扩展名
+    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+// 文件过滤器：只允许图片
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只支持上传图片文件 (jpeg, jpg, png, gif, webp)'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 限制 10MB
+  }
+});
+
+// 静态文件服务：让上传的图片可以通过 URL 访问
+app.use('/files/images', express.static(uploadDir));
+
+/**
+ * 图片上传接口
+ * POST /api/upload/image
+ * Content-Type: multipart/form-data
+ * Body: file (图片文件)
+ * Response: { "success": true, "url": "http://x.x.x.x/files/images/xxx.png", "filename": "xxx.png" }
+ */
+app.post('/api/upload/image', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: '请选择要上传的图片文件' });
+  }
+
+  const protocol = req.protocol;
+  const host = req.get('host');
+  const fileUrl = `${protocol}://${host}/files/images/${req.file.filename}`;
+
+  console.log(`[Upload] 图片上传成功: ${req.file.originalname} -> ${req.file.filename}`);
+
+  res.json({
+    success: true,
+    url: fileUrl,
+    filename: req.file.filename,
+    originalname: req.file.originalname,
+    size: req.file.size,
+    mimetype: req.file.mimetype
+  });
+});
+
+// 错误处理中间件（处理 multer 错误）
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    // Multer 错误
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: '文件大小超过限制（最大 10MB）' });
+    }
+    return res.status(400).json({ error: `上传错误: ${err.message}` });
+  } else if (err) {
+    // 其他错误
+    return res.status(400).json({ error: err.message });
+  }
+  next();
+});
+
 // ==================== 辅助接口 ====================
 
 // 获取所有任务（用于调试）
@@ -220,6 +308,9 @@ app.listen(PORT, () => {
   console.log(`\n内网服务端接口:`);
   console.log(`  GET    http://localhost:${PORT}/api/agent/getAgentTask`);
   console.log(`  PUT    http://localhost:${PORT}/api/agent/updateAgentStatus/:taskId`);
+  console.log(`\n图片上传接口:`);
+  console.log(`  POST   http://localhost:${PORT}/api/upload/image`);
+  console.log(`  访问   http://localhost:${PORT}/files/images/<filename>`);
   console.log(`\n辅助接口:`);
   console.log(`  GET    http://localhost:${PORT}/api/tasks`);
   console.log(`  DELETE http://localhost:${PORT}/api/tasks/completed`);
