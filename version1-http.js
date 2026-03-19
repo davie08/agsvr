@@ -35,14 +35,29 @@ const tasks = new Map();
 /**
  * 启动Agent会话
  * POST /api/client/startAgent
- * Body: { "input": "用户输入的文本", "uuid": "可选，用于连续对话的会话ID" }
+ * Body: { 
+ *   "input": "用户输入的文本", 
+ *   "uuid": "可选，用于连续对话的会话ID",
+ *   "attachments": [
+ *     {
+ *       "type": "image",
+ *       "url": "https://...",
+ *       "mimeType": "image/png"
+ *     }
+ *   ]
+ * }
  * Response: { "taskId": "xxx", "status": "todo" }
  */
 app.post('/api/client/startAgent', (req, res) => {
-  const { input, uuid } = req.body;
+  const { input, uuid, attachments } = req.body;
   
   if (!input) {
     return res.status(400).json({ error: 'input参数必填' });
+  }
+
+  // 验证 attachments 格式
+  if (attachments && !Array.isArray(attachments)) {
+    return res.status(400).json({ error: 'attachments必须是数组格式' });
   }
 
   // 使用请求中的uuid，如果没有则生成新的
@@ -66,6 +81,7 @@ app.post('/api/client/startAgent', (req, res) => {
       id: taskId,
       status: TaskStatus.TODO,
       input: input,
+      attachments: attachments || null,
       output: null,
       createdAt: existingTask.createdAt, // 保持原始创建时间
       updatedAt: new Date().toISOString(),
@@ -74,6 +90,9 @@ app.post('/api/client/startAgent', (req, res) => {
     
     tasks.set(taskId, task);
     console.log(`[Client] 连续对话任务: ${taskId}, 输入: ${input}`);
+    if (attachments && attachments.length > 0) {
+      console.log(`[Client] 附件数量: ${attachments.length}`);
+    }
     
     return res.json({
       taskId: taskId,
@@ -88,6 +107,7 @@ app.post('/api/client/startAgent', (req, res) => {
     id: taskId,
     status: TaskStatus.TODO,
     input: input,
+    attachments: attachments || null,
     output: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -96,6 +116,9 @@ app.post('/api/client/startAgent', (req, res) => {
 
   tasks.set(taskId, task);
   console.log(`[Client] 创建任务: ${taskId}, 输入: ${input}`);
+  if (attachments && attachments.length > 0) {
+    console.log(`[Client] 附件数量: ${attachments.length}`);
+  }
 
   res.json({
     taskId: taskId,
@@ -108,7 +131,7 @@ app.post('/api/client/startAgent', (req, res) => {
 /**
  * 获取任务状态
  * GET /api/client/getAgentStatus/:taskId
- * Response: { "taskId": "xxx", "status": "completed", "output": "AI响应", ... }
+ * Response: { "taskId": "xxx", "status": "completed", "input": "AI响应", "attachments": [...], "output": "...", ... }
  */
 app.get('/api/client/getAgentStatus/:taskId', (req, res) => {
   const { taskId } = req.params;
@@ -124,6 +147,7 @@ app.get('/api/client/getAgentStatus/:taskId', (req, res) => {
     taskId: task.id,
     status: task.status,
     input: task.input,
+    attachments: task.attachments,
     output: task.output,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt
@@ -135,7 +159,7 @@ app.get('/api/client/getAgentStatus/:taskId', (req, res) => {
 /**
  * 获取待执行的任务
  * GET /api/agent/getAgentTask
- * Response: { "task": { "id": "xxx", "input": "...", ... } } 或 { "task": null }
+ * Response: { "task": { "id": "xxx", "input": "...", "attachments": [...], ... } } 或 { "task": null }
  */
 app.get('/api/agent/getAgentTask', (req, res) => {
   // 查找第一个todo状态的任务
